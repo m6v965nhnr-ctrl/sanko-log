@@ -50,8 +50,19 @@ export async function listMyJoinedClasses(studentId: string): Promise<SchoolClas
 
 export type RosterEntry = {
   student: Profile;
-  books: (Book & { pagesRead: number; latestComprehension: number | null; maxCycle: number })[];
+  books: (Book & { pagesRead: number; latestComprehension: number | null; maxCycle: number; bucketCounts: number[] })[];
 };
+
+// ページごとの記録回数(周回をまたいだ、のべ回数)を、5段階(1回〜5回以上)のバケツに数える(進捗バー用)
+function bucketPageCounts(marks: BookPageMark[]): number[] {
+  const perPage = new Map<number, number>();
+  for (const m of marks) perPage.set(m.page_number, (perPage.get(m.page_number) ?? 0) + 1);
+  const buckets = [0, 0, 0, 0, 0];
+  for (const count of perPage.values()) {
+    buckets[Math.min(count, 5) - 1]++;
+  }
+  return buckets;
+}
 
 export async function getRoster(classId: string): Promise<RosterEntry[]> {
   const { data: members } = await supabase.from("class_members").select("profiles(*)").eq("class_id", classId);
@@ -87,11 +98,13 @@ export async function getRoster(classId: string): Promise<RosterEntry[]> {
     student,
     books: bookList.map((b) => {
       const key = `${b.id}:${student.id}`;
+      const marks = marksByBookStudent.get(key) ?? [];
       return {
         ...b,
-        pagesRead: new Set((marksByBookStudent.get(key) ?? []).map((m) => m.page_number)).size,
+        pagesRead: new Set(marks.map((m) => m.page_number)).size,
         latestComprehension: latestCompByBookStudent.get(key) ?? null,
         maxCycle: maxCycleByBookStudent.get(key) ?? 1,
+        bucketCounts: bucketPageCounts(marks),
       };
     }),
   }));

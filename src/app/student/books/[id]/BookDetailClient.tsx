@@ -13,20 +13,9 @@ import {
   setComprehension,
   togglePageMark,
 } from "@/lib/books";
+import { CARD_CLASS, CONTENT_CLASS, cycleColorClass, HEADER_CLASS, OUTLINE_BUTTON_CLASS, PAGE_CLASS, PRIMARY_BUTTON_CLASS } from "@/lib/ui";
+import { CycleLegend } from "@/components/CycleLegend";
 import type { Book, BookCycle, BookPageMark } from "@/lib/types";
-
-const COLOR_BY_COUNT = [
-  "bg-gray-100 text-gray-400", // 0回
-  "bg-gray-200 text-gray-700", // 1回
-  "bg-teal-200 text-teal-900", // 2回
-  "bg-blue-300 text-blue-950", // 3回
-  "bg-indigo-300 text-indigo-950", // 4回
-  "bg-purple-400 text-white", // 5回以上
-];
-
-function colorClass(count: number) {
-  return COLOR_BY_COUNT[Math.min(count, COLOR_BY_COUNT.length - 1)];
-}
 
 export default function BookDetailClient({ id }: { id: string }) {
   const { profile, loading } = useProfile("student");
@@ -104,40 +93,48 @@ export default function BookDetailClient({ id }: { id: string }) {
   if (book === null) return <p className="p-6 text-sm text-gray-500">見つかりませんでした。</p>;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
-      <button onClick={() => router.push("/student")} className="text-sm text-gray-400 hover:text-gray-700">
-        ← 参考書一覧
-      </button>
-      <h1 className="mt-2 text-xl font-bold text-gray-900">{book.title}</h1>
+    <main className={PAGE_CLASS}>
+      <header className={HEADER_CLASS}>
+        <div className="mx-auto max-w-2xl">
+          <button onClick={() => router.push("/student")} className="text-sm text-gray-400">
+            ← 参考書一覧
+          </button>
+          <h1 className="mt-2 text-xl font-semibold tracking-tight text-gray-900">{book.title}</h1>
+        </div>
+      </header>
 
-      {!book.total_pages ? (
-        <p className="mt-6 text-sm text-gray-500">先生がまだページ数を設定していません。</p>
-      ) : (
-        <>
-          <div className="mt-6 flex items-center justify-between">
-            <p className="text-sm font-bold text-gray-900">{currentCycle}周目</p>
-            <button onClick={onNextCycle} className="rounded-full border-2 border-teal-600 px-4 py-1.5 text-xs font-bold text-teal-700 hover:bg-teal-50">
-              次の周へ
-            </button>
-          </div>
+      <div className={CONTENT_CLASS}>
+        {!book.total_pages ? (
+          <section className={CARD_CLASS}>
+            <p className="text-sm text-gray-500">先生がまだページ数を設定していません。</p>
+          </section>
+        ) : (
+          <>
+            <section className={CARD_CLASS}>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold text-gray-900">{currentCycle}周目</p>
+                <button onClick={onNextCycle} className={OUTLINE_BUTTON_CLASS}>
+                  次の周へ
+                </button>
+              </div>
 
-          <div className="mt-3">
-            <p className="text-xs font-medium text-gray-500">理解度（この周）：{currentComprehension ?? "未記録"}</p>
-            <input
-              type="range"
-              min={0}
-              max={10}
-              step={0.5}
-              value={currentComprehension ?? 5}
-              onChange={(e) => onComprehension(Number(e.target.value))}
-              className="mt-1 w-full accent-teal-600"
-            />
-          </div>
+              <div className="mt-3">
+                <p className="text-xs font-medium text-gray-500">理解度（この周）：{currentComprehension ?? "未記録"}</p>
+                <input
+                  type="range"
+                  min={0}
+                  max={10}
+                  step={0.5}
+                  value={currentComprehension ?? 5}
+                  onChange={(e) => onComprehension(Number(e.target.value))}
+                  className="mt-1 w-full accent-emerald-500"
+                />
+              </div>
+            </section>
 
-          <form onSubmit={onMarkRange} className="mt-6 flex items-end gap-2">
-            <label className="text-xs text-gray-500">
-              範囲でまとめて記録
-              <div className="mt-1 flex items-center gap-1">
+            <section className={CARD_CLASS}>
+              <p className="text-sm font-semibold text-gray-900">範囲でまとめて記録</p>
+              <form onSubmit={onMarkRange} className="mt-2 flex items-center gap-2">
                 <input
                   value={rangeFrom}
                   onChange={(e) => setRangeFrom(e.target.value.replace(/\D/g, ""))}
@@ -155,34 +152,40 @@ export default function BookDetailClient({ id }: { id: string }) {
                   required
                   className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
                 />
-              </div>
-            </label>
-            <button type="submit" className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-bold text-white">
-              記録
-            </button>
-          </form>
-
-          <div className="mt-6 grid grid-cols-10 gap-1.5 sm:grid-cols-12">
-            {Array.from({ length: book.total_pages }, (_, i) => i + 1).map((p) => {
-              const isMarkedNow = markedThisCycle.has(p);
-              const count = counts.get(p) ?? 0;
-              return (
-                <button
-                  key={p}
-                  onClick={() => onTogglePage(p)}
-                  className={`aspect-square rounded-md text-[10px] font-bold ring-2 transition ${colorClass(count)} ${isMarkedNow ? "ring-teal-600" : "ring-transparent"}`}
-                  title={`${p}ページ（累計${count}回）`}
-                >
-                  {p}
+                <button type="submit" className={PRIMARY_BUTTON_CLASS}>
+                  記録
                 </button>
-              );
-            })}
-          </div>
-          <p className="mt-3 text-[11px] leading-5 text-gray-400">
-            タップで、この周の記録をオン・オフ。枠の色は、この周に記録済み。背景の濃さは、通算の記録回数（濃いほど多い）。
-          </p>
-        </>
-      )}
+              </form>
+            </section>
+
+            <section className={CARD_CLASS}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-gray-900">タップして記録</p>
+                <CycleLegend />
+              </div>
+              <div className="mt-3 grid grid-cols-8 gap-1 sm:grid-cols-10">
+                {Array.from({ length: book.total_pages }, (_, i) => i + 1).map((p) => {
+                  const isMarkedNow = markedThisCycle.has(p);
+                  const count = counts.get(p) ?? 0;
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => onTogglePage(p)}
+                      className={`h-7 w-7 rounded text-[10px] font-bold ring-2 transition ${cycleColorClass(count)} ${isMarkedNow ? "ring-emerald-600" : "ring-transparent"}`}
+                      title={`${p}ページ（累計${count}回）`}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-[11px] leading-5 text-gray-400">
+                タップで、この周の記録をオン・オフ。枠の色は、この周に記録済み。背景の濃さは、通算の記録回数（濃いほど多い）。
+              </p>
+            </section>
+          </>
+        )}
+      </div>
     </main>
   );
 }
