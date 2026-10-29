@@ -1,9 +1,28 @@
 import { supabase } from "@/lib/supabase";
 import type { Book, BookCycle, BookPageMark } from "@/lib/types";
 
-export async function listMyBooks(userId: string): Promise<Book[]> {
-  const { data } = await supabase.from("books").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+// クラスの参考書一覧(先生の画面用)
+export async function listClassBooks(classId: string): Promise<Book[]> {
+  const { data } = await supabase.from("books").select("*").eq("class_id", classId).order("created_at", { ascending: false });
   return data ?? [];
+}
+
+// 自分が参加している、すべてのクラスの参考書(学生の画面用)
+export async function listStudentBooks(studentId: string): Promise<(Book & { class_name: string | null })[]> {
+  const { data: memberships } = await supabase.from("class_members").select("class_id").eq("student_id", studentId);
+  const classIds = (memberships ?? []).map((m) => m.class_id);
+  if (classIds.length === 0) return [];
+
+  const { data } = await supabase
+    .from("books")
+    .select("*, classes(name)")
+    .in("class_id", classIds)
+    .order("created_at", { ascending: false });
+
+  return (data ?? []).map((b) => {
+    const { classes, ...book } = b as Book & { classes: { name: string } | null };
+    return { ...book, class_name: classes?.name ?? null };
+  });
 }
 
 export async function getBook(bookId: string): Promise<Book | null> {
@@ -11,63 +30,66 @@ export async function getBook(bookId: string): Promise<Book | null> {
   return data;
 }
 
-export async function createBook(userId: string, title: string, totalPages: number | null): Promise<Book> {
+// 参考書の追加は、先生だけができる(RLSでも制限)
+export async function createBook(classId: string, title: string, totalPages: number): Promise<Book> {
   const { data, error } = await supabase
     .from("books")
-    .insert({ user_id: userId, title, total_pages: totalPages })
+    .insert({ class_id: classId, title, total_pages: totalPages })
     .select("*")
     .single();
   if (error) throw error;
   return data;
 }
 
-export async function setShowToTeacher(bookId: string, show: boolean) {
-  const { error } = await supabase.from("books").update({ show_to_teacher: show }).eq("id", bookId);
-  if (error) throw error;
-}
-
-export async function listCycles(bookId: string): Promise<BookCycle[]> {
-  const { data } = await supabase.from("book_cycles").select("*").eq("book_id", bookId).order("cycle_number");
+export async function listCycles(bookId: string, studentId: string): Promise<BookCycle[]> {
+  const { data } = await supabase.from("book_cycles").select("*").eq("book_id", bookId).eq("student_id", studentId).order("cycle_number");
   return data ?? [];
 }
 
-// 周回を開始する(無ければ作る)。cycle_numberを返す
-export async function ensureCycle(bookId: string, cycleNumber: number): Promise<void> {
-  const { error } = await supabase.from("book_cycles").upsert({ book_id: bookId, cycle_number: cycleNumber }, { onConflict: "book_id,cycle_number", ignoreDuplicates: true });
-  if (error) throw error;
-}
-
-export async function setComprehension(bookId: string, cycleNumber: number, comprehension: number) {
+// 周回を開始する(無ければ作る)
+export async function ensureCycle(bookId: string, studentId: string, cycleNumber: number): Promise<void> {
   const { error } = await supabase
     .from("book_cycles")
-    .upsert({ book_id: bookId, cycle_number: cycleNumber, comprehension }, { onConflict: "book_id,cycle_number" });
+    .upsert({ book_id: bookId, student_id: studentId, cycle_number: cycleNumber }, { onConflict: "book_id,student_id,cycle_number", ignoreDuplicates: true });
   if (error) throw error;
 }
 
-export async function listPageMarks(bookId: string): Promise<BookPageMark[]> {
-  const { data } = await supabase.from("book_page_marks").select("*").eq("book_id", bookId);
+export async function setComprehension(bookId: string, studentId: string, cycleNumber: number, comprehension: number) {
+  const { error } = await supabase
+    .from("book_cycles")
+    .upsert({ book_id: bookId, student_id: studentId, cycle_number: cycleNumber, comprehension }, { onConflict: "book_id,student_id,cycle_number" });
+  if (error) throw error;
+}
+
+export async function listPageMarks(bookId: string, studentId: string): Promise<BookPageMark[]> {
+  const { data } = await supabase.from("book_page_marks").select("*").eq("book_id", bookId).eq("student_id", studentId);
   return data ?? [];
 }
 
-export async function togglePageMark(bookId: string, cycleNumber: number, pageNumber: number, marked: boolean) {
+export async function togglePageMark(bookId: string, studentId: string, cycleNumber: number, pageNumber: number, marked: boolean) {
   if (marked) {
-    const { error } = await supabase.from("book_page_marks").insert({ book_id: bookId, cycle_number: cycleNumber, page_number: pageNumber });
+    const { error } = await supabase
+      .from("book_page_marks")
+      .insert({ book_id: bookId, student_id: studentId, cycle_number: cycleNumber, page_number: pageNumber });
     if (error && error.code !== "23505") throw error; // 重複は無視
   } else {
     const { error } = await supabase
       .from("book_page_marks")
       .delete()
       .eq("book_id", bookId)
+      .eq("student_id", studentId)
       .eq("cycle_number", cycleNumber)
       .eq("page_number", pageNumber);
     if (error) throw error;
   }
 }
 
-export async function markPageRange(bookId: string, cycleNumber: number, from: number, to: number) {
+export async function markPageRange(bookId: string, studentId: string, cycleNumber: number, from: number, to: number) {
   const rows = [];
-  for (let p = from; p <= to; p++) rows.push({ book_id: bookId, cycle_number: cycleNumber, page_number: p });
-  const { error } = await supabase.from("book_page_marks").upsert(rows, { onConflict: "book_id,cycle_number,page_number", ignoreDuplicates: true });
+  for (let p = from; p <= to; p++) rows.push({ book_id: bookId, student_id: studentId, cycle_number: cycleNumber, page_number: p });
+  const { error } = await supabase
+    .from("book_page_marks")
+    .upsert(rows, { onConflict: "book_id,student_id,cycle_number,page_number", ignoreDuplicates: true });
   if (error) throw error;
 }
 

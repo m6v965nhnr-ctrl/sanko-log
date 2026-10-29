@@ -11,10 +11,8 @@ import {
   listPageMarks,
   markPageRange,
   setComprehension,
-  setShowToTeacher,
   togglePageMark,
 } from "@/lib/books";
-import { supabase } from "@/lib/supabase";
 import type { Book, BookCycle, BookPageMark } from "@/lib/types";
 
 const COLOR_BY_COUNT = [
@@ -39,16 +37,16 @@ export default function BookDetailClient({ id }: { id: string }) {
   const [currentCycle, setCurrentCycle] = useState(1);
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
-  const [totalPagesInput, setTotalPagesInput] = useState("");
 
   const load = async () => {
+    if (!profile) return;
     const b = await getBook(id);
     if (!b) {
       setBook(null);
       return;
     }
     setBook(b);
-    const [cy, mk] = await Promise.all([listCycles(b.id), listPageMarks(b.id)]);
+    const [cy, mk] = await Promise.all([listCycles(b.id, profile.id), listPageMarks(b.id, profile.id)]);
     setCycles(cy);
     setMarks(mk);
     setCurrentCycle(cy.length ? Math.max(...cy.map((c) => c.cycle_number)) : 1);
@@ -68,51 +66,38 @@ export default function BookDetailClient({ id }: { id: string }) {
   const currentComprehension = cycles.find((c) => c.cycle_number === currentCycle)?.comprehension ?? null;
 
   async function onTogglePage(p: number) {
-    if (!book) return;
+    if (!book || !profile) return;
     const marked = markedThisCycle.has(p);
-    await ensureCycle(book.id, currentCycle);
-    await togglePageMark(book.id, currentCycle, p, !marked);
+    await ensureCycle(book.id, profile.id, currentCycle);
+    await togglePageMark(book.id, profile.id, currentCycle, p, !marked);
     await load();
   }
 
   async function onMarkRange(e: React.FormEvent) {
     e.preventDefault();
-    if (!book) return;
+    if (!book || !profile) return;
     const from = Number(rangeFrom);
     const to = Number(rangeTo);
     if (!from || !to || from > to) return;
-    await ensureCycle(book.id, currentCycle);
-    await markPageRange(book.id, currentCycle, from, to);
+    await ensureCycle(book.id, profile.id, currentCycle);
+    await markPageRange(book.id, profile.id, currentCycle, from, to);
     setRangeFrom("");
     setRangeTo("");
     await load();
   }
 
   async function onNextCycle() {
-    if (!book) return;
+    if (!book || !profile) return;
     const next = currentCycle + 1;
-    await ensureCycle(book.id, next);
+    await ensureCycle(book.id, profile.id, next);
     setCurrentCycle(next);
   }
 
   async function onComprehension(value: number) {
-    if (!book) return;
-    await ensureCycle(book.id, currentCycle);
-    await setComprehension(book.id, currentCycle, value);
+    if (!book || !profile) return;
+    await ensureCycle(book.id, profile.id, currentCycle);
+    await setComprehension(book.id, profile.id, currentCycle, value);
     await load();
-  }
-
-  async function onToggleShow() {
-    if (!book) return;
-    await setShowToTeacher(book.id, !book.show_to_teacher);
-    setBook({ ...book, show_to_teacher: !book.show_to_teacher });
-  }
-
-  async function onSetTotalPages(e: React.FormEvent) {
-    e.preventDefault();
-    if (!book || !totalPagesInput) return;
-    const { error } = await supabase.from("books").update({ total_pages: Number(totalPagesInput) }).eq("id", book.id);
-    if (!error) setBook({ ...book, total_pages: Number(totalPagesInput) });
   }
 
   if (loading || book === undefined) return <p className="p-6 text-sm text-gray-500">読み込み中…</p>;
@@ -125,24 +110,8 @@ export default function BookDetailClient({ id }: { id: string }) {
       </button>
       <h1 className="mt-2 text-xl font-bold text-gray-900">{book.title}</h1>
 
-      <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
-        <input type="checkbox" checked={book.show_to_teacher} onChange={onToggleShow} className="h-4 w-4" />
-        先生に進み具合を見せる
-      </label>
-
       {!book.total_pages ? (
-        <form onSubmit={onSetTotalPages} className="mt-6 flex gap-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
-          <input
-            value={totalPagesInput}
-            onChange={(e) => setTotalPagesInput(e.target.value.replace(/\D/g, ""))}
-            placeholder="総ページ数"
-            inputMode="numeric"
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-base"
-          />
-          <button type="submit" className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-bold text-white">
-            設定
-          </button>
-        </form>
+        <p className="mt-6 text-sm text-gray-500">先生がまだページ数を設定していません。</p>
       ) : (
         <>
           <div className="mt-6 flex items-center justify-between">

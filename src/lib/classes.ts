@@ -58,38 +58,41 @@ export async function getRoster(classId: string): Promise<RosterEntry[]> {
   const students = (members ?? []).map((m) => m.profiles as unknown as Profile).filter(Boolean);
   if (students.length === 0) return [];
 
-  const studentIds = students.map((s) => s.id);
-  const { data: books } = await supabase.from("books").select("*").in("user_id", studentIds).eq("show_to_teacher", true);
+  const { data: books } = await supabase.from("books").select("*").eq("class_id", classId).order("created_at");
   const bookList = books ?? [];
   const bookIds = bookList.map((b) => b.id);
 
-  const marksByBook = new Map<string, BookPageMark[]>();
-  const latestCompByBook = new Map<string, number | null>();
-  const maxCycleByBook = new Map<string, number>();
+  // 本×学生ごとに進捗を集計する("bookId:studentId"をキーにする)
+  const marksByBookStudent = new Map<string, BookPageMark[]>();
+  const latestCompByBookStudent = new Map<string, number | null>();
+  const maxCycleByBookStudent = new Map<string, number>();
 
   if (bookIds.length > 0) {
     const { data: marks } = await supabase.from("book_page_marks").select("*").in("book_id", bookIds);
     for (const m of marks ?? []) {
-      const arr = marksByBook.get(m.book_id) ?? [];
+      const key = `${m.book_id}:${m.student_id}`;
+      const arr = marksByBookStudent.get(key) ?? [];
       arr.push(m);
-      marksByBook.set(m.book_id, arr);
+      marksByBookStudent.set(key, arr);
     }
     const { data: cycles } = await supabase.from("book_cycles").select("*").in("book_id", bookIds).order("cycle_number");
     for (const c of cycles ?? []) {
-      maxCycleByBook.set(c.book_id, c.cycle_number);
-      if (c.comprehension !== null) latestCompByBook.set(c.book_id, c.comprehension);
+      const key = `${c.book_id}:${c.student_id}`;
+      maxCycleByBookStudent.set(key, c.cycle_number);
+      if (c.comprehension !== null) latestCompByBookStudent.set(key, c.comprehension);
     }
   }
 
   return students.map((student) => ({
     student,
-    books: bookList
-      .filter((b) => b.user_id === student.id)
-      .map((b) => ({
+    books: bookList.map((b) => {
+      const key = `${b.id}:${student.id}`;
+      return {
         ...b,
-        pagesRead: new Set((marksByBook.get(b.id) ?? []).map((m) => m.page_number)).size,
-        latestComprehension: latestCompByBook.get(b.id) ?? null,
-        maxCycle: maxCycleByBook.get(b.id) ?? 1,
-      })),
+        pagesRead: new Set((marksByBookStudent.get(key) ?? []).map((m) => m.page_number)).size,
+        latestComprehension: latestCompByBookStudent.get(key) ?? null,
+        maxCycle: maxCycleByBookStudent.get(key) ?? 1,
+      };
+    }),
   }));
 }

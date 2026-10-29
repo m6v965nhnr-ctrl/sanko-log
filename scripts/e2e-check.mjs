@@ -35,10 +35,24 @@ async function main() {
   if (cErr) throw cErr;
   console.log("クラス作成OK:", cls.id, cls.join_code);
 
+  // 先生が参考書を登録する(本はクラスの持ち物)
+  const { data: book, error: bErr } = await teacher
+    .from("books")
+    .insert({ class_id: cls.id, title: "検証用テキスト", total_pages: 100 })
+    .select("*")
+    .single();
+  if (bErr) throw bErr;
+  console.log("先生が参考書を登録OK:", book.id);
+
   const student = client();
   const { data: sAuth, error: sErr } = await student.auth.signInWithPassword({ email: studentEmail, password });
   if (sErr) throw sErr;
   console.log("学生ログインOK:", sAuth.user.id);
+
+  // 学生は、参考書を直接追加できない(先生だけができる)
+  const { error: studentAddBookErr } = await student.from("books").insert({ class_id: cls.id, title: "勝手に追加", total_pages: 10 });
+  assert(studentAddBookErr, "学生による参考書の直接追加は拒否されるべき");
+  console.log("学生の参考書追加は拒否されるOK:", studentAddBookErr.message);
 
   // 他の先生のクラスへ、直接class_membersへinsertできない(RPC経由のみ)ことを確認
   const { error: directInsertErr } = await student.from("class_members").insert({ class_id: cls.id, student_id: sAuth.user.id });
@@ -49,40 +63,35 @@ async function main() {
   if (joinErr) throw joinErr;
   console.log("参加コードで参加OK:", joinRes);
 
-  const { data: book, error: bErr } = await student
-    .from("books")
-    .insert({ user_id: sAuth.user.id, title: "検証用テキスト", total_pages: 100, show_to_teacher: true })
-    .select("*")
-    .single();
-  if (bErr) throw bErr;
-  console.log("本の登録OK:", book.id);
+  // 参加後、学生から、先生が登録した参考書が見える
+  const { data: studentSeesBook, error: ssbErr } = await student.from("books").select("*").eq("id", book.id).maybeSingle();
+  if (ssbErr) throw ssbErr;
+  assert(studentSeesBook, "参加後、学生から参考書が見えるべき");
+  console.log("学生から参考書が見えるOK:", studentSeesBook.title);
 
+  // 学生が、自分の進捗(ページ記録・理解度)を記録する
   const { error: markErr } = await student.from("book_page_marks").insert([
-    { book_id: book.id, cycle_number: 1, page_number: 1 },
-    { book_id: book.id, cycle_number: 1, page_number: 2 },
+    { book_id: book.id, student_id: sAuth.user.id, cycle_number: 1, page_number: 1 },
+    { book_id: book.id, student_id: sAuth.user.id, cycle_number: 1, page_number: 2 },
   ]);
   if (markErr) throw markErr;
 
-  const { error: compErr } = await student.from("book_cycles").insert({ book_id: book.id, cycle_number: 1, comprehension: 7.5 });
+  const { error: compErr } = await student
+    .from("book_cycles")
+    .insert({ book_id: book.id, student_id: sAuth.user.id, cycle_number: 1, comprehension: 7.5 });
   if (compErr) throw compErr;
   console.log("ページ記録・理解度の記録OK");
 
-  // 先生から、生徒の本が見えるか(show_to_teacher=trueなので見えるはず)
-  const { data: teacherSeesBook, error: tbErr } = await teacher.from("books").select("*").eq("id", book.id).maybeSingle();
-  if (tbErr) throw tbErr;
-  assert(teacherSeesBook, "先生から、公開設定の本が見えるべき");
-  console.log("先生から本が見えるOK:", teacherSeesBook.title);
+  // 先生から、生徒の進捗が見える(本はクラスの持ち物なので、常に見える)
+  const { data: teacherSeesMarks, error: tmErr } = await teacher.from("book_page_marks").select("*").eq("book_id", book.id);
+  if (tmErr) throw tmErr;
+  assert(teacherSeesMarks.length === 2, "先生から、生徒のページ記録が見えるべき");
+  console.log("先生から生徒の進捗が見えるOK:", teacherSeesMarks.length, "件");
 
   // 先生から、生徒のプロフィール(名前)が見えるか
   const { data: teacherSeesProfile } = await teacher.from("profiles").select("*").eq("id", sAuth.user.id).maybeSingle();
   assert(teacherSeesProfile, "先生から、クラスの生徒のプロフィールが見えるべき");
   console.log("先生から生徒名が見えるOK:", teacherSeesProfile.display_name);
-
-  // 生徒が公開をオフにしたら、先生から見えなくなるか
-  await student.from("books").update({ show_to_teacher: false }).eq("id", book.id);
-  const { data: afterHide } = await teacher.from("books").select("*").eq("id", book.id).maybeSingle();
-  assert(!afterHide, "非公開にした本は、先生から見えなくなるべき");
-  console.log("非公開化で見えなくなるOK");
 
   console.log("\n✅ 全項目OK");
 }

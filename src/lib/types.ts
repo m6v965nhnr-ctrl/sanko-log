@@ -19,16 +19,16 @@ export type SchoolClass = {
 
 export type Book = {
   id: string;
-  user_id: string;
+  class_id: string;
   title: string;
   total_pages: number | null;
-  show_to_teacher: boolean;
   created_at: string;
 };
 
 export type BookCycle = {
   id: string;
   book_id: string;
+  student_id: string;
   cycle_number: number;
   comprehension: number | null;
   created_at: string;
@@ -36,6 +36,7 @@ export type BookCycle = {
 
 export type BookPageMark = {
   book_id: string;
+  student_id: string;
   cycle_number: number;
   page_number: number;
   marked_at: string;
