@@ -143,6 +143,7 @@ export default function BookDetailClient({ id }: { id: string }) {
                   onChange={(e) => setRangeFrom(e.target.value.replace(/\D/g, ""))}
                   placeholder="開始"
                   inputMode="numeric"
+                  required
                   className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
                 />
                 〜
@@ -151,6 +152,7 @@ export default function BookDetailClient({ id }: { id: string }) {
                   onChange={(e) => setRangeTo(e.target.value.replace(/\D/g, ""))}
                   placeholder="終了"
                   inputMode="numeric"
+                  required
                   className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
                 />
               </div>
