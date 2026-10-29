@@ -123,8 +123,12 @@ export default function ClassDetailClient({ id }: { id: string }) {
           ) : (
             <ul className="mt-2 divide-y divide-gray-100">
               {roster.map((r) => {
-                const logCount = r.books.reduce((sum, b) => sum + b.bucketCounts.reduce((a, n) => a + n, 0), 0);
+                const logCount = r.books.reduce((sum, b) => sum + b.logCount, 0);
                 const furthest = Math.max(0, ...r.books.map((b) => b.pagesRead));
+                const lastStudiedOn = r.books.reduce<string | null>(
+                  (acc, b) => (!acc || (b.lastStudiedOn && b.lastStudiedOn > acc) ? b.lastStudiedOn ?? acc : acc),
+                  null
+                );
                 return (
                   <li key={r.student.id} className="py-1.5 text-xs">
                     <button
@@ -134,7 +138,7 @@ export default function ClassDetailClient({ id }: { id: string }) {
                       {r.student.display_name ?? "（名前未設定）"}
                     </button>{" "}
                     <span className={countColor(logCount)}>
-                      {logCount === 0 ? "記録なし" : `最大p.${furthest}まで（記録${logCount}回）`}
+                      {logCount === 0 ? "記録なし" : `p.${furthest}まで（記録${logCount}回・最終 ${lastStudiedOn}）`}
                     </span>
                   </li>
                 );

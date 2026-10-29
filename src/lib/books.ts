@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { Book, BookCycle, BookPageMark } from "@/lib/types";
+import type { Book, StudyLog } from "@/lib/types";
 
 // クラスの参考書一覧(先生の画面用)
 export async function listClassBooks(classId: string): Promise<Book[]> {
@@ -41,61 +41,78 @@ export async function createBook(classId: string, title: string, totalPages: num
   return data;
 }
 
-export async function listCycles(bookId: string, studentId: string): Promise<BookCycle[]> {
-  const { data } = await supabase.from("book_cycles").select("*").eq("book_id", bookId).eq("student_id", studentId).order("cycle_number");
+export async function listStudyLogs(bookId: string, studentId: string): Promise<StudyLog[]> {
+  const { data } = await supabase
+    .from("book_study_logs")
+    .select("*")
+    .eq("book_id", bookId)
+    .eq("student_id", studentId)
+    .order("studied_on", { ascending: false })
+    .order("created_at", { ascending: false });
   return data ?? [];
 }
 
-// 周回を開始する(無ければ作る)
-export async function ensureCycle(bookId: string, studentId: string, cycleNumber: number): Promise<void> {
+export async function addStudyLog(
+  bookId: string,
+  studentId: string,
+  pageStart: number,
+  pageEnd: number,
+  studiedOn: string,
+  understanding: number | null
+): Promise<StudyLog> {
+  const { data, error } = await supabase
+    .from("book_study_logs")
+    .insert({ book_id: bookId, student_id: studentId, page_start: pageStart, page_end: pageEnd, studied_on: studiedOn, understanding })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateStudyLog(id: string, pageStart: number, pageEnd: number, studiedOn: string): Promise<void> {
   const { error } = await supabase
-    .from("book_cycles")
-    .upsert({ book_id: bookId, student_id: studentId, cycle_number: cycleNumber }, { onConflict: "book_id,student_id,cycle_number", ignoreDuplicates: true });
+    .from("book_study_logs")
+    .update({ page_start: pageStart, page_end: pageEnd, studied_on: studiedOn })
+    .eq("id", id);
   if (error) throw error;
 }
 
-export async function setComprehension(bookId: string, studentId: string, cycleNumber: number, comprehension: number) {
-  const { error } = await supabase
-    .from("book_cycles")
-    .upsert({ book_id: bookId, student_id: studentId, cycle_number: cycleNumber, comprehension }, { onConflict: "book_id,student_id,cycle_number" });
+export async function deleteStudyLog(id: string): Promise<void> {
+  const { error } = await supabase.from("book_study_logs").delete().eq("id", id);
   if (error) throw error;
 }
 
-export async function listPageMarks(bookId: string, studentId: string): Promise<BookPageMark[]> {
-  const { data } = await supabase.from("book_page_marks").select("*").eq("book_id", bookId).eq("student_id", studentId);
-  return data ?? [];
-}
-
-export async function togglePageMark(bookId: string, studentId: string, cycleNumber: number, pageNumber: number, marked: boolean) {
-  if (marked) {
-    const { error } = await supabase
-      .from("book_page_marks")
-      .insert({ book_id: bookId, student_id: studentId, cycle_number: cycleNumber, page_number: pageNumber });
-    if (error && error.code !== "23505") throw error; // 重複は無視
-  } else {
-    const { error } = await supabase
-      .from("book_page_marks")
-      .delete()
-      .eq("book_id", bookId)
-      .eq("student_id", studentId)
-      .eq("cycle_number", cycleNumber)
-      .eq("page_number", pageNumber);
-    if (error) throw error;
-  }
-}
-
-export async function markPageRange(bookId: string, studentId: string, cycleNumber: number, from: number, to: number) {
-  const rows = [];
-  for (let p = from; p <= to; p++) rows.push({ book_id: bookId, student_id: studentId, cycle_number: cycleNumber, page_number: p });
-  const { error } = await supabase
-    .from("book_page_marks")
-    .upsert(rows, { onConflict: "book_id,student_id,cycle_number,page_number", ignoreDuplicates: true });
-  if (error) throw error;
-}
-
-// ページごとの「のべ周回数」(色の濃さに使う)
-export function countByPage(marks: BookPageMark[]): Map<number, number> {
+// 複数の記録(ページ範囲)から、ページごとの通算記録回数を数える(色の濃さ・進捗バーに使う)
+export function countByPageFromLogs(logs: StudyLog[]): Map<number, number> {
   const map = new Map<number, number>();
-  for (const m of marks) map.set(m.page_number, (map.get(m.page_number) ?? 0) + 1);
+  for (const log of logs) {
+    for (let p = log.page_start; p <= log.page_end; p++) {
+      map.set(p, (map.get(p) ?? 0) + 1);
+    }
+  }
   return map;
+}
+
+// 選んだページ番号の集合を、連続した範囲ごとに分ける(記録の保存に使う)
+export function toPageRanges(pages: number[]): [number, number][] {
+  const sorted = [...pages].sort((a, b) => a - b);
+  const ranges: [number, number][] = [];
+  let start: number | undefined;
+  let prev: number | undefined;
+  for (const p of sorted) {
+    if (start === undefined) {
+      start = p;
+      prev = p;
+      continue;
+    }
+    if (p === (prev as number) + 1) {
+      prev = p;
+      continue;
+    }
+    ranges.push([start, prev as number]);
+    start = p;
+    prev = p;
+  }
+  if (start !== undefined) ranges.push([start, prev as number]);
+  return ranges;
 }

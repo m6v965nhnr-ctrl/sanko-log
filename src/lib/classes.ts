@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { Book, BookPageMark, Profile, SchoolClass } from "@/lib/types";
+import type { Book, Profile, SchoolClass, StudyLog } from "@/lib/types";
 
 function randomCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 紛らわしい文字を除く
@@ -50,13 +50,24 @@ export async function listMyJoinedClasses(studentId: string): Promise<SchoolClas
 
 export type RosterEntry = {
   student: Profile;
-  books: (Book & { pagesRead: number; latestComprehension: number | null; maxCycle: number; bucketCounts: number[] })[];
+  books: (Book & {
+    pagesRead: number;
+    latestComprehension: number | null;
+    lastStudiedOn: string | null;
+    logCount: number;
+    bucketCounts: number[];
+    logs: StudyLog[];
+  })[];
 };
 
-// ページごとの記録回数(周回をまたいだ、のべ回数)を、5段階(1回〜5回以上)のバケツに数える(進捗バー用)
-function bucketPageCounts(marks: BookPageMark[]): number[] {
+// ページごとの記録回数(複数の記録をまたいだ、のべ回数)を、5段階(1回〜5回以上)のバケツに数える(進捗バー用)
+function bucketPageCounts(logs: StudyLog[]): number[] {
   const perPage = new Map<number, number>();
-  for (const m of marks) perPage.set(m.page_number, (perPage.get(m.page_number) ?? 0) + 1);
+  for (const log of logs) {
+    for (let p = log.page_start; p <= log.page_end; p++) {
+      perPage.set(p, (perPage.get(p) ?? 0) + 1);
+    }
+  }
   const buckets = [0, 0, 0, 0, 0];
   for (const count of perPage.values()) {
     buckets[Math.min(count, 5) - 1]++;
@@ -74,23 +85,15 @@ export async function getRoster(classId: string): Promise<RosterEntry[]> {
   const bookIds = bookList.map((b) => b.id);
 
   // 本×学生ごとに進捗を集計する("bookId:studentId"をキーにする)
-  const marksByBookStudent = new Map<string, BookPageMark[]>();
-  const latestCompByBookStudent = new Map<string, number | null>();
-  const maxCycleByBookStudent = new Map<string, number>();
+  const logsByBookStudent = new Map<string, StudyLog[]>();
 
   if (bookIds.length > 0) {
-    const { data: marks } = await supabase.from("book_page_marks").select("*").in("book_id", bookIds);
-    for (const m of marks ?? []) {
-      const key = `${m.book_id}:${m.student_id}`;
-      const arr = marksByBookStudent.get(key) ?? [];
-      arr.push(m);
-      marksByBookStudent.set(key, arr);
-    }
-    const { data: cycles } = await supabase.from("book_cycles").select("*").in("book_id", bookIds).order("cycle_number");
-    for (const c of cycles ?? []) {
-      const key = `${c.book_id}:${c.student_id}`;
-      maxCycleByBookStudent.set(key, c.cycle_number);
-      if (c.comprehension !== null) latestCompByBookStudent.set(key, c.comprehension);
+    const { data: logs } = await supabase.from("book_study_logs").select("*").in("book_id", bookIds).order("studied_on");
+    for (const log of (logs ?? []) as StudyLog[]) {
+      const key = `${log.book_id}:${log.student_id}`;
+      const arr = logsByBookStudent.get(key) ?? [];
+      arr.push(log);
+      logsByBookStudent.set(key, arr);
     }
   }
 
@@ -98,13 +101,18 @@ export async function getRoster(classId: string): Promise<RosterEntry[]> {
     student,
     books: bookList.map((b) => {
       const key = `${b.id}:${student.id}`;
-      const marks = marksByBookStudent.get(key) ?? [];
+      const bookLogs = logsByBookStudent.get(key) ?? [];
+      const pages = new Set<number>();
+      for (const log of bookLogs) for (let p = log.page_start; p <= log.page_end; p++) pages.add(p);
+      const latest = bookLogs.reduce<StudyLog | null>((acc, log) => (!acc || log.studied_on >= acc.studied_on ? log : acc), null);
       return {
         ...b,
-        pagesRead: new Set(marks.map((m) => m.page_number)).size,
-        latestComprehension: latestCompByBookStudent.get(key) ?? null,
-        maxCycle: maxCycleByBookStudent.get(key) ?? 1,
-        bucketCounts: bucketPageCounts(marks),
+        pagesRead: pages.size,
+        latestComprehension: latest?.understanding ?? null,
+        lastStudiedOn: latest?.studied_on ?? null,
+        logCount: bookLogs.length,
+        bucketCounts: bucketPageCounts(bookLogs),
+        logs: [...bookLogs].sort((a, b2) => (a.studied_on < b2.studied_on ? 1 : -1)),
       };
     }),
   }));

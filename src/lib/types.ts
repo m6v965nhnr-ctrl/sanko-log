@@ -25,19 +25,14 @@ export type Book = {
   created_at: string;
 };
 
-export type BookCycle = {
+// 1回の記録(ページ範囲・日付・任意の理解度)。過去の記録として、一覧・編集・削除ができる
+export type StudyLog = {
   id: string;
   book_id: string;
   student_id: string;
-  cycle_number: number;
-  comprehension: number | null;
+  page_start: number;
+  page_end: number;
+  studied_on: string;
+  understanding: number | null;
   created_at: string;
-};
-
-export type BookPageMark = {
-  book_id: string;
-  student_id: string;
-  cycle_number: number;
-  page_number: number;
-  marked_at: string;
 };

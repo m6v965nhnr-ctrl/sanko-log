@@ -3,29 +3,36 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/useProfile";
+import { addStudyLog, countByPageFromLogs, deleteStudyLog, getBook, listStudyLogs, toPageRanges, updateStudyLog } from "@/lib/books";
 import {
-  countByPage,
-  ensureCycle,
-  getBook,
-  listCycles,
-  listPageMarks,
-  markPageRange,
-  setComprehension,
-  togglePageMark,
-} from "@/lib/books";
-import { CARD_CLASS, CONTENT_CLASS, cycleColorClass, HEADER_CLASS, OUTLINE_BUTTON_CLASS, PAGE_CLASS, PRIMARY_BUTTON_CLASS } from "@/lib/ui";
+  CARD_CLASS,
+  CONTENT_CLASS,
+  cycleColorClass,
+  HEADER_CLASS,
+  OUTLINE_BUTTON_CLASS,
+  PAGE_CLASS,
+  PRIMARY_BUTTON_CLASS,
+  todayStr,
+  understandingLabel,
+} from "@/lib/ui";
 import { CycleLegend } from "@/components/CycleLegend";
-import type { Book, BookCycle, BookPageMark } from "@/lib/types";
+import type { Book, StudyLog } from "@/lib/types";
 
 export default function BookDetailClient({ id }: { id: string }) {
   const { profile, loading } = useProfile("student");
   const router = useRouter();
   const [book, setBook] = useState<Book | null | undefined>(undefined);
-  const [cycles, setCycles] = useState<BookCycle[]>([]);
-  const [marks, setMarks] = useState<BookPageMark[]>([]);
-  const [currentCycle, setCurrentCycle] = useState(1);
+  const [logs, setLogs] = useState<StudyLog[]>([]);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [rangeFrom, setRangeFrom] = useState("");
   const [rangeTo, setRangeTo] = useState("");
+  const [studiedOn, setStudiedOn] = useState(todayStr());
+  const [understanding, setUnderstanding] = useState(5);
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFrom, setEditFrom] = useState("");
+  const [editTo, setEditTo] = useState("");
+  const [editDate, setEditDate] = useState("");
 
   const load = async () => {
     if (!profile) return;
@@ -35,10 +42,7 @@ export default function BookDetailClient({ id }: { id: string }) {
       return;
     }
     setBook(b);
-    const [cy, mk] = await Promise.all([listCycles(b.id, profile.id), listPageMarks(b.id, profile.id)]);
-    setCycles(cy);
-    setMarks(mk);
-    setCurrentCycle(cy.length ? Math.max(...cy.map((c) => c.cycle_number)) : 1);
+    setLogs(await listStudyLogs(b.id, profile.id));
   };
 
   useEffect(() => {
@@ -47,45 +51,66 @@ export default function BookDetailClient({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, id]);
 
-  const counts = useMemo(() => countByPage(marks), [marks]);
-  const markedThisCycle = useMemo(
-    () => new Set(marks.filter((m) => m.cycle_number === currentCycle).map((m) => m.page_number)),
-    [marks, currentCycle]
-  );
-  const currentComprehension = cycles.find((c) => c.cycle_number === currentCycle)?.comprehension ?? null;
+  const counts = useMemo(() => countByPageFromLogs(logs), [logs]);
 
-  async function onTogglePage(p: number) {
-    if (!book || !profile) return;
-    const marked = markedThisCycle.has(p);
-    await ensureCycle(book.id, profile.id, currentCycle);
-    await togglePageMark(book.id, profile.id, currentCycle, p, !marked);
-    await load();
+  function onTogglePage(p: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(p)) next.delete(p);
+      else next.add(p);
+      return next;
+    });
   }
 
-  async function onMarkRange(e: React.FormEvent) {
+  function onAddRange(e: React.FormEvent) {
     e.preventDefault();
-    if (!book || !profile) return;
     const from = Number(rangeFrom);
     const to = Number(rangeTo);
     if (!from || !to || from > to) return;
-    await ensureCycle(book.id, profile.id, currentCycle);
-    await markPageRange(book.id, profile.id, currentCycle, from, to);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (let p = from; p <= to; p++) next.add(p);
+      return next;
+    });
     setRangeFrom("");
     setRangeTo("");
+  }
+
+  async function onSave() {
+    if (!book || !profile || selected.size === 0) return;
+    setSaving(true);
+    try {
+      const ranges = toPageRanges([...selected]);
+      for (const [from, to] of ranges) {
+        await addStudyLog(book.id, profile.id, from, to, studiedOn, understanding);
+      }
+      setSelected(new Set());
+      await load();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function startEdit(log: StudyLog) {
+    setEditingId(log.id);
+    setEditFrom(String(log.page_start));
+    setEditTo(String(log.page_end));
+    setEditDate(log.studied_on);
+  }
+
+  async function saveEdit() {
+    if (!editingId) return;
+    const from = Number(editFrom);
+    const to = Number(editTo);
+    if (!from || !to || from > to || !editDate) return;
+    await updateStudyLog(editingId, from, to, editDate);
+    setEditingId(null);
     await load();
   }
 
-  async function onNextCycle() {
-    if (!book || !profile) return;
-    const next = currentCycle + 1;
-    await ensureCycle(book.id, profile.id, next);
-    setCurrentCycle(next);
-  }
-
-  async function onComprehension(value: number) {
-    if (!book || !profile) return;
-    await ensureCycle(book.id, profile.id, currentCycle);
-    await setComprehension(book.id, profile.id, currentCycle, value);
+  async function onDelete(logId: string) {
+    if (!confirm("この記録を削除しますか？")) return;
+    await deleteStudyLog(logId);
     await load();
   }
 
@@ -111,30 +136,8 @@ export default function BookDetailClient({ id }: { id: string }) {
         ) : (
           <>
             <section className={CARD_CLASS}>
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-gray-900">{currentCycle}周目</p>
-                <button onClick={onNextCycle} className={OUTLINE_BUTTON_CLASS}>
-                  次の周へ
-                </button>
-              </div>
-
-              <div className="mt-3">
-                <p className="text-xs font-medium text-gray-500">理解度（この周）：{currentComprehension ?? "未記録"}</p>
-                <input
-                  type="range"
-                  min={0}
-                  max={10}
-                  step={0.5}
-                  value={currentComprehension ?? 5}
-                  onChange={(e) => onComprehension(Number(e.target.value))}
-                  className="mt-1 w-full accent-emerald-500"
-                />
-              </div>
-            </section>
-
-            <section className={CARD_CLASS}>
-              <p className="text-sm font-semibold text-gray-900">範囲でまとめて記録</p>
-              <form onSubmit={onMarkRange} className="mt-2 flex items-center gap-2">
+              <p className="text-sm font-semibold text-gray-900">まとめて選ぶ</p>
+              <form onSubmit={onAddRange} className="mt-2 flex items-center gap-2">
                 <input
                   value={rangeFrom}
                   onChange={(e) => setRangeFrom(e.target.value.replace(/\D/g, ""))}
@@ -152,26 +155,26 @@ export default function BookDetailClient({ id }: { id: string }) {
                   required
                   className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
                 />
-                <button type="submit" className={PRIMARY_BUTTON_CLASS}>
-                  記録
+                <button type="submit" className={OUTLINE_BUTTON_CLASS}>
+                  選択に追加
                 </button>
               </form>
             </section>
 
             <section className={CARD_CLASS}>
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-gray-900">タップして記録</p>
+                <p className="text-sm font-semibold text-gray-900">タップして選ぶ</p>
                 <CycleLegend />
               </div>
               <div className="mt-3 grid grid-cols-8 gap-1 sm:grid-cols-10">
                 {Array.from({ length: book.total_pages }, (_, i) => i + 1).map((p) => {
-                  const isMarkedNow = markedThisCycle.has(p);
+                  const isSelected = selected.has(p);
                   const count = counts.get(p) ?? 0;
                   return (
                     <button
                       key={p}
                       onClick={() => onTogglePage(p)}
-                      className={`h-7 w-7 rounded text-[10px] font-bold ring-2 transition ${cycleColorClass(count)} ${isMarkedNow ? "ring-emerald-600" : "ring-transparent"}`}
+                      className={`h-7 w-7 rounded text-[10px] font-bold transition ${isSelected ? "bg-emerald-500 text-white" : cycleColorClass(count)}`}
                       title={`${p}ページ（累計${count}回）`}
                     >
                       {p}
@@ -180,9 +183,96 @@ export default function BookDetailClient({ id }: { id: string }) {
                 })}
               </div>
               <p className="mt-3 text-[11px] leading-5 text-gray-400">
-                タップで、この周の記録をオン・オフ。枠の色は、この周に記録済み。背景の濃さは、通算の記録回数（濃いほど多い）。
+                タップで、記録する範囲をオン・オフ（緑が選択中）。背景の濃さは、通算の記録回数（濃いほど多い）。
               </p>
             </section>
+
+            <details className={CARD_CLASS}>
+              <summary className="cursor-pointer text-sm font-semibold text-gray-900">これまでの記録（{logs.length}件）</summary>
+              {logs.length === 0 ? (
+                <p className="mt-3 text-xs text-gray-400">まだ記録がありません。</p>
+              ) : (
+                <ul className="mt-3 divide-y divide-gray-100">
+                  {logs.map((log) => (
+                    <li key={log.id} className="py-2 text-xs">
+                      {editingId === log.id ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            value={editFrom}
+                            onChange={(e) => setEditFrom(e.target.value.replace(/\D/g, ""))}
+                            className="w-16 rounded border border-gray-300 px-1.5 py-1 text-xs"
+                          />
+                          〜
+                          <input
+                            value={editTo}
+                            onChange={(e) => setEditTo(e.target.value.replace(/\D/g, ""))}
+                            className="w-16 rounded border border-gray-300 px-1.5 py-1 text-xs"
+                          />
+                          <input
+                            type="date"
+                            value={editDate}
+                            onChange={(e) => setEditDate(e.target.value)}
+                            className="rounded border border-gray-300 px-1.5 py-1 text-xs"
+                          />
+                          <button onClick={saveEdit} className="rounded-full bg-black px-3 py-1 text-[11px] font-semibold text-white">
+                            保存
+                          </button>
+                          <button onClick={() => setEditingId(null)} className="rounded-full border border-gray-300 px-3 py-1 text-[11px] text-gray-700">
+                            やめる
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-gray-600">
+                            p.{log.page_start}〜{log.page_end} ・ {log.studied_on}
+                            {log.understanding !== null && ` ・ 理解度 ${log.understanding}（${understandingLabel(log.understanding)}）`}
+                          </span>
+                          <span className="flex shrink-0 gap-2">
+                            <button onClick={() => startEdit(log)} className="text-gray-500 underline">
+                              編集
+                            </button>
+                            <button onClick={() => onDelete(log.id)} className="text-red-500 underline">
+                              削除
+                            </button>
+                          </span>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </details>
+
+            <div className={`sticky bottom-0 z-10 ${CARD_CLASS}`}>
+              <p className="text-sm font-semibold text-gray-900">選択中: {selected.size}ページ</p>
+              <label className="mt-2 block text-xs text-gray-500">
+                日付
+                <input
+                  type="date"
+                  value={studiedOn}
+                  onChange={(e) => setStudiedOn(e.target.value)}
+                  className="mt-1 block rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+                />
+              </label>
+              <div className="mt-2">
+                <p className="text-xs text-gray-500">
+                  理解度：{understanding.toFixed(1)}　{understandingLabel(understanding)}
+                </p>
+                <input
+                  type="range"
+                  min={0}
+                  max={10}
+                  step={0.5}
+                  value={understanding}
+                  onChange={(e) => setUnderstanding(Number(e.target.value))}
+                  className="mt-1 w-full accent-emerald-500"
+                />
+              </div>
+              <button onClick={onSave} disabled={selected.size === 0 || saving} className={`mt-3 w-full ${PRIMARY_BUTTON_CLASS}`}>
+                {saving ? "記録中…" : "記録する"}
+              </button>
+              <p className="mt-2 text-center text-[11px] text-gray-400">この記録は、クラスの先生に見えます。</p>
+            </div>
           </>
         )}
       </div>

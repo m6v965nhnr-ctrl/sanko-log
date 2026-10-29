@@ -24,3 +24,20 @@ export const CARD_CLASS = "rounded-2xl bg-white p-4 shadow-sm";
 export const PAGE_CLASS = "min-h-screen bg-[#fafafa] pb-28";
 export const HEADER_CLASS = "border-b border-gray-100 bg-white px-6 py-5";
 export const CONTENT_CLASS = "mx-auto max-w-2xl space-y-3 px-6 py-5";
+
+// 0〜10の理解度を、ことばに変える
+export function understandingLabel(v: number): string {
+  if (v < 2.5) return "理解してない";
+  if (v < 4.5) return "少し";
+  if (v < 5.5) return "半分";
+  if (v < 7) return "まあまあ";
+  if (v < 9.5) return "それなりに";
+  return "完璧";
+}
+
+export function todayStr(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
