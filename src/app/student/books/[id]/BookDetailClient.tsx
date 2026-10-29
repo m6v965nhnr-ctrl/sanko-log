@@ -284,7 +284,7 @@ export default function BookDetailClient({ id }: { id: string }) {
               )}
             </details>
 
-            <div className="sticky bottom-0 z-10 mx-auto w-full max-w-xs space-y-2 rounded-2xl bg-white p-4 shadow-md">
+            <div className="sticky bottom-0 z-10 mx-auto w-full max-w-xs space-y-1.5 rounded-2xl bg-white p-3 shadow-md">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-gray-600">選択中: {selected.size}ページ</p>
                 <label className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -319,7 +319,6 @@ export default function BookDetailClient({ id }: { id: string }) {
               <button onClick={onSave} disabled={selected.size === 0 || saving} className={`w-full ${PRIMARY_BUTTON_CLASS}`}>
                 {saving ? "記録中…" : "記録する"}
               </button>
-              <p className="text-[11px] text-gray-400">この記録は、クラスの先生に見えます。</p>
             </div>
           </>
         )}
