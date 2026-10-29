@@ -66,7 +66,7 @@ export default function StudentHome() {
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase tracking-widest"
               maxLength={6}
             />
-            <button type="submit" className={PRIMARY_BUTTON_CLASS}>
+            <button type="submit" className={`px-6 ${PRIMARY_BUTTON_CLASS}`}>
               参加
             </button>
           </form>

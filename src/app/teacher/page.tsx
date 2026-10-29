@@ -67,7 +67,7 @@ export default function TeacherHome() {
               placeholder="学校名（任意）"
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
-            <button type="submit" disabled={busy} className={PRIMARY_BUTTON_CLASS}>
+            <button type="submit" disabled={busy} className={`px-6 ${PRIMARY_BUTTON_CLASS}`}>
               作成
             </button>
           </form>

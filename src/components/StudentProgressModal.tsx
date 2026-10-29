@@ -12,6 +12,10 @@ export function StudentProgressModal({ entry, onClose }: { entry: RosterEntry; o
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
+  const understandingValues = entry.books.flatMap((b) => b.logs.map((l) => l.understanding).filter((u): u is number => u !== null));
+  const avgUnderstanding =
+    understandingValues.length > 0 ? understandingValues.reduce((a, b) => a + b, 0) / understandingValues.length : null;
+
   return createPortal(
     <div className="fixed inset-0 z-[1000] flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div
@@ -28,6 +32,15 @@ export function StudentProgressModal({ entry, onClose }: { entry: RosterEntry; o
         <div className="mt-3">
           <CycleLegend />
         </div>
+
+        {avgUnderstanding !== null && (
+          <div className="mt-3 rounded-xl bg-gray-900 px-3 py-2.5 text-white">
+            <p className="text-[11px] text-white/70">理解度（自己評価の平均）</p>
+            <p className="text-sm font-bold">
+              {avgUnderstanding.toFixed(1)} <span className="ml-1 text-xs font-normal text-white/80">{understandingLabel(avgUnderstanding)}</span>
+            </p>
+          </div>
+        )}
 
         {entry.books.length === 0 ? (
           <p className="mt-4 text-xs text-gray-400">まだ参考書がありません。</p>
@@ -46,7 +59,7 @@ export function StudentProgressModal({ entry, onClose }: { entry: RosterEntry; o
                   <ul className="mt-2 divide-y divide-gray-100">
                     {b.logs.map((log) => (
                       <li key={log.id} className="py-1 text-[10px] text-gray-500">
-                        p.{log.page_start}〜{log.page_end} ・ {log.studied_on}
+                        {log.studied_on} ・ p.{log.page_start}-{log.page_end}
                         {log.understanding !== null && ` ・ 理解度 ${log.understanding}（${understandingLabel(log.understanding)}）`}
                       </li>
                     ))}

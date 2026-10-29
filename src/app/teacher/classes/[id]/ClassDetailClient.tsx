@@ -99,7 +99,7 @@ export default function ClassDetailClient({ id }: { id: string }) {
               required
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm sm:w-32"
             />
-            <button type="submit" disabled={busy} className={PRIMARY_BUTTON_CLASS}>
+            <button type="submit" disabled={busy} className={`px-6 ${PRIMARY_BUTTON_CLASS}`}>
               追加
             </button>
           </form>
