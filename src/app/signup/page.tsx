@@ -10,6 +10,7 @@ export default function SignupPage() {
   const router = useRouter();
   const [role, setRole] = useState<Role>("student");
   const [displayName, setDisplayName] = useState("");
+  const [schoolName, setSchoolName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +26,7 @@ export default function SignupPage() {
         router.push("/student");
         return;
       }
-      const { session } = await signUp(email, password, role, displayName);
+      const { session } = await signUp(email, password, role, displayName, schoolName);
       if (session) {
         router.push("/teacher");
       } else {
@@ -77,6 +78,16 @@ export default function SignupPage() {
           </p>
         ) : (
           <>
+            <label className="text-sm font-medium text-gray-700">
+              学校名
+              <input
+                required
+                value={schoolName}
+                onChange={(e) => setSchoolName(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-base"
+                placeholder="例：〇〇専門学校"
+              />
+            </label>
             <label className="text-sm font-medium text-gray-700">
               メールアドレス
               <input

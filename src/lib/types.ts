@@ -4,6 +4,7 @@ export type Profile = {
   id: string;
   role: Role;
   display_name: string | null;
+  school_name: string | null;
   created_at: string;
 };
 

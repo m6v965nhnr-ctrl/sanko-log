@@ -1,11 +1,11 @@
 import { supabase } from "@/lib/supabase";
 import type { Profile, Role } from "@/lib/types";
 
-export async function signUp(email: string, password: string, role: Role, displayName: string) {
+export async function signUp(email: string, password: string, role: Role, displayName: string, schoolName: string) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { role, display_name: displayName } },
+    options: { data: { role, display_name: displayName, school_name: schoolName } },
   });
   if (error) throw error;
   return data;
