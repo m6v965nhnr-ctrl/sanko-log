@@ -26,7 +26,7 @@ export default function Home() {
           ログイン
         </Link>
       </div>
-      <p className="mt-10 text-xs text-gray-400">登録・基本機能は無料です。</p>
+      <p className="mt-10 text-xs text-gray-400">学生は名前だけで、すぐ始められます。先生はメールで登録します。</p>
     </main>
   );
 }

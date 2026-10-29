@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signUp } from "@/lib/auth";
+import { signUp, startAsStudent } from "@/lib/auth";
 import type { Role } from "@/lib/types";
 
 export default function SignupPage() {
@@ -20,9 +20,14 @@ export default function SignupPage() {
     setError(null);
     setLoading(true);
     try {
+      if (role === "student") {
+        await startAsStudent(displayName);
+        router.push("/student");
+        return;
+      }
       const { session } = await signUp(email, password, role, displayName);
       if (session) {
-        router.push(role === "teacher" ? "/teacher" : "/student");
+        router.push("/teacher");
       } else {
         setError("確認メールを送りました。メール内のリンクを開いてから、ログインしてください。");
       }
@@ -35,7 +40,7 @@ export default function SignupPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 py-12">
-      <h1 className="text-2xl font-bold text-gray-900">無料で登録</h1>
+      <h1 className="text-2xl font-bold text-gray-900">無料ではじめる</h1>
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
         <div className="flex gap-2">
           <button
@@ -63,39 +68,53 @@ export default function SignupPage() {
             placeholder="例：山田太郎"
           />
         </label>
-        <label className="text-sm font-medium text-gray-700">
-          メールアドレス
-          <input
-            required
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-base"
-          />
-        </label>
-        <label className="text-sm font-medium text-gray-700">
-          パスワード（8文字以上）
-          <input
-            required
-            minLength={8}
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-base"
-          />
-        </label>
+
+        {role === "student" ? (
+          <p className="text-xs leading-6 text-gray-500">
+            学生は、メールアドレス・パスワードは不要です。名前だけで、すぐに始められます。
+            <br />
+            （この端末・ブラウザに記録が残ります。機種変更などで引き継げない点はご了承ください）
+          </p>
+        ) : (
+          <>
+            <label className="text-sm font-medium text-gray-700">
+              メールアドレス
+              <input
+                required
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-base"
+              />
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              パスワード（8文字以上）
+              <input
+                required
+                minLength={8}
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-base"
+              />
+            </label>
+          </>
+        )}
+
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           type="submit"
           disabled={loading}
           className="mt-2 rounded-full bg-teal-600 px-6 py-3 text-base font-bold text-white transition hover:bg-teal-700 disabled:opacity-50"
         >
-          {loading ? "登録中…" : "登録する"}
+          {loading ? "処理中…" : role === "student" ? "はじめる" : "登録する"}
         </button>
       </form>
-      <p className="mt-6 text-center text-sm text-gray-500">
-        すでにアカウントをお持ちの方は <Link href="/login" className="font-bold text-teal-700 underline">ログイン</Link>
-      </p>
+      {role === "teacher" && (
+        <p className="mt-6 text-center text-sm text-gray-500">
+          すでにアカウントをお持ちの方は <Link href="/login" className="font-bold text-teal-700 underline">ログイン</Link>
+        </p>
+      )}
     </main>
   );
 }

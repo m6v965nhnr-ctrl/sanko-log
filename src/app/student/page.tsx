@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useProfile } from "@/lib/useProfile";
 import { createBook, listMyBooks } from "@/lib/books";
 import { joinClassByCode } from "@/lib/classes";
-import { signOut } from "@/lib/auth";
 import type { Book } from "@/lib/types";
 
 export default function StudentHome() {
@@ -53,12 +52,7 @@ export default function StudentHome() {
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-10">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">{profile.display_name ?? "学生"}さんの参考書</h1>
-        <button onClick={() => signOut().then(() => location.assign("/login"))} className="text-sm text-gray-400 hover:text-gray-700">
-          ログアウト
-        </button>
-      </div>
+      <h1 className="text-xl font-bold text-gray-900">{profile.display_name ?? "学生"}さんの参考書</h1>
 
       <section className="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-5">
         <h2 className="text-sm font-bold text-gray-900">クラスに参加する</h2>

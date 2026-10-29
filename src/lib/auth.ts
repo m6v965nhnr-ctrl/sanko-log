@@ -11,6 +11,15 @@ export async function signUp(email: string, password: string, role: Role, displa
   return data;
 }
 
+// 学生は、メール・パスワードなし。名前だけで始められる(匿名ログイン)
+export async function startAsStudent(displayName: string) {
+  const { data, error } = await supabase.auth.signInAnonymously({
+    options: { data: { role: "student", display_name: displayName } },
+  });
+  if (error) throw error;
+  return data;
+}
+
 export async function signIn(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
