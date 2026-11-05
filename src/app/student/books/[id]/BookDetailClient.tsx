@@ -191,6 +191,7 @@ export default function BookDetailClient({ id }: { id: string }) {
               <form onSubmit={onAddRange} className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <input
+                    type="tel"
                     value={rangeFrom}
                     onChange={(e) => setRangeFrom(e.target.value.replace(/\D/g, ""))}
                     placeholder="開始p"
@@ -199,6 +200,7 @@ export default function BookDetailClient({ id }: { id: string }) {
                     className="min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
                   />
                   <input
+                    type="tel"
                     value={rangeTo}
                     onChange={(e) => setRangeTo(e.target.value.replace(/\D/g, ""))}
                     placeholder="終了p"
@@ -221,6 +223,7 @@ export default function BookDetailClient({ id }: { id: string }) {
 
               <form onSubmit={onJump} className="flex items-center gap-2">
                 <input
+                  type="tel"
                   value={jumpTo}
                   onChange={(e) => setJumpTo(e.target.value.replace(/\D/g, ""))}
                   placeholder="ページ番号"
@@ -267,14 +270,20 @@ export default function BookDetailClient({ id }: { id: string }) {
                       {editingId === log.id ? (
                         <div className="flex flex-wrap items-center gap-2">
                           <input
+                            type="tel"
                             value={editFrom}
                             onChange={(e) => setEditFrom(e.target.value.replace(/\D/g, ""))}
+                            inputMode="numeric"
+                            aria-label="開始ページ"
                             className="w-16 rounded border border-gray-300 px-1.5 py-1 text-xs"
                           />
                           〜
                           <input
+                            type="tel"
                             value={editTo}
                             onChange={(e) => setEditTo(e.target.value.replace(/\D/g, ""))}
+                            inputMode="numeric"
+                            aria-label="終了ページ"
                             className="w-16 rounded border border-gray-300 px-1.5 py-1 text-xs"
                           />
                           <input

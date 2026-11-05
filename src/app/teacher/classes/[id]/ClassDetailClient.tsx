@@ -92,6 +92,7 @@ export default function ClassDetailClient({ id }: { id: string }) {
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
             <input
+              type="tel"
               value={pages}
               onChange={(e) => setPages(e.target.value.replace(/\D/g, ""))}
               placeholder="総ページ数"
