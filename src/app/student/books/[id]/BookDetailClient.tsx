@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/useProfile";
-import { addStudyLog, countByPageFromLogs, deleteStudyLog, getBook, listStudyLogs, toPageRanges, updateStudyLog } from "@/lib/books";
+import { addStudyLog, countByPageFromLogs, deleteStudyLog, getBook, listStudyLogs, toBucketCounts, toPageRanges, updateStudyLog } from "@/lib/books";
 import {
   CARD_CLASS,
   CONTENT_CLASS,
@@ -17,6 +17,8 @@ import {
   understandingLabel,
 } from "@/lib/ui";
 import { CycleLegend } from "@/components/CycleLegend";
+import { ProgressBar } from "@/components/ProgressBar";
+import { DailyRecordView } from "@/components/DailyRecordView";
 import type { Book, StudyLog } from "@/lib/types";
 
 export default function BookDetailClient({ id }: { id: string }) {
@@ -35,6 +37,7 @@ export default function BookDetailClient({ id }: { id: string }) {
   const [editFrom, setEditFrom] = useState("");
   const [editTo, setEditTo] = useState("");
   const [editDate, setEditDate] = useState("");
+  const [tab, setTab] = useState<"record" | "progress">("record");
 
   const load = async () => {
     if (!profile) return;
@@ -55,6 +58,7 @@ export default function BookDetailClient({ id }: { id: string }) {
 
   const counts = useMemo(() => countByPageFromLogs(logs), [logs]);
   const pagesRead = counts.size;
+  const bucketCounts = useMemo(() => toBucketCounts(counts), [counts]);
 
   function onTogglePage(p: number) {
     setSelected((prev) => {
@@ -132,10 +136,7 @@ export default function BookDetailClient({ id }: { id: string }) {
     <main className={PAGE_CLASS}>
       <header className={HEADER_CLASS}>
         <div className="mx-auto max-w-2xl">
-          <button onClick={() => router.push("/student")} className="text-sm text-gray-400">
-            ← 参考書一覧
-          </button>
-          <h1 className="mt-2 text-xl font-semibold tracking-tight">参考書の進捗</h1>
+          <h1 className="text-xl font-semibold tracking-tight">参考書の進捗</h1>
           <p className="mt-1 text-xs leading-5 text-gray-500">やったページをタップして、まとめて記録できます。</p>
         </div>
       </header>
@@ -157,6 +158,33 @@ export default function BookDetailClient({ id }: { id: string }) {
             <p className="text-sm text-gray-500">先生がまだページ数を設定していません。</p>
           </section>
         ) : (
+          <>
+            <div role="tablist" aria-label="表示の種類" className="grid grid-cols-2 rounded-full border border-gray-200 p-1 text-xs font-medium">
+              {(["record", "progress"] as const).map((t) => (
+                <button
+                  key={t}
+                  role="tab"
+                  aria-selected={tab === t}
+                  onClick={() => setTab(t)}
+                  className={`rounded-full py-1.5 transition ${tab === t ? "bg-gray-900 text-white" : "text-gray-500"}`}
+                >
+                  {t === "record" ? "記録" : "進捗"}
+                </button>
+              ))}
+            </div>
+
+            {tab === "progress" ? (
+              <section className={`space-y-4 ${CARD_CLASS}`}>
+                <div>
+                  <p className="mb-1 text-xs font-semibold text-gray-700">全体</p>
+                  <ProgressBar bucketCounts={bucketCounts} total={book.total_pages} />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-semibold text-gray-700">日々の記録</p>
+                  <DailyRecordView logs={logs} />
+                </div>
+              </section>
+            ) : (
           <>
             <section className={`space-y-2 ${CARD_CLASS}`}>
               <p className="text-xs font-semibold text-gray-700">まとめて選ぶ</p>
@@ -320,6 +348,8 @@ export default function BookDetailClient({ id }: { id: string }) {
                 {saving ? "記録中…" : "記録する"}
               </button>
             </div>
+          </>
+            )}
           </>
         )}
       </div>

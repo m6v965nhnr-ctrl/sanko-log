@@ -93,6 +93,15 @@ export function countByPageFromLogs(logs: StudyLog[]): Map<number, number> {
   return map;
 }
 
+// ページごとの記録回数(1〜5回以上)を、進捗バー用の5段階バケツに数える
+export function toBucketCounts(countsByPage: Map<number, number>): number[] {
+  const buckets = [0, 0, 0, 0, 0];
+  for (const count of countsByPage.values()) {
+    buckets[Math.min(count, 5) - 1]++;
+  }
+  return buckets;
+}
+
 // 選んだページ番号の集合を、連続した範囲ごとに分ける(記録の保存に使う)
 export function toPageRanges(pages: number[]): [number, number][] {
   const sorted = [...pages].sort((a, b) => a - b);
