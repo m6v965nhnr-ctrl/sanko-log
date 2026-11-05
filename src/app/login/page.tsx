@@ -30,7 +30,10 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 py-12">
-      <h1 className="text-2xl font-bold text-gray-900">ログイン</h1>
+      <Link href="/" className="text-sm text-gray-400">
+        ← トップに戻る
+      </Link>
+      <h1 className="mt-4 text-2xl font-bold text-gray-900">ログイン</h1>
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
         <label className="text-sm font-medium text-gray-700">
           メールアドレス

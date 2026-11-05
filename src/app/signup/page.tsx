@@ -36,7 +36,10 @@ export default function SignupPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 py-12">
-      <h1 className="text-2xl font-bold text-gray-900">無料ではじめる</h1>
+      <Link href="/" className="text-sm text-gray-400">
+        ← トップに戻る
+      </Link>
+      <h1 className="mt-4 text-2xl font-bold text-gray-900">無料ではじめる</h1>
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
         <div className="flex gap-2">
           <button
