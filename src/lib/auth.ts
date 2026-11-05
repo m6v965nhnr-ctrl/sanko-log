@@ -1,20 +1,11 @@
 import { supabase } from "@/lib/supabase";
 import type { Profile, Role } from "@/lib/types";
 
-export async function signUp(email: string, password: string, role: Role, displayName: string, schoolName: string) {
+export async function signUp(email: string, password: string, role: Role, displayName: string, schoolName?: string) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { role, display_name: displayName, school_name: schoolName } },
-  });
-  if (error) throw error;
-  return data;
-}
-
-// 学生は、メール・パスワードなし。名前だけで始められる(匿名ログイン)
-export async function startAsStudent(displayName: string) {
-  const { data, error } = await supabase.auth.signInAnonymously({
-    options: { data: { role: "student", display_name: displayName } },
+    options: { data: { role, display_name: displayName, ...(schoolName ? { school_name: schoolName } : {}) } },
   });
   if (error) throw error;
   return data;

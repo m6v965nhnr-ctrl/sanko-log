@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signUp, startAsStudent } from "@/lib/auth";
+import { signUp } from "@/lib/auth";
 import type { Role } from "@/lib/types";
 
 export default function SignupPage() {
@@ -21,14 +21,9 @@ export default function SignupPage() {
     setError(null);
     setLoading(true);
     try {
-      if (role === "student") {
-        await startAsStudent(displayName);
-        router.push("/student");
-        return;
-      }
-      const { session } = await signUp(email, password, role, displayName, schoolName);
+      const { session } = await signUp(email, password, role, displayName, role === "teacher" ? schoolName : undefined);
       if (session) {
-        router.push("/teacher");
+        router.push(role === "teacher" ? "/teacher" : "/student");
       } else {
         setError("確認メールを送りました。メール内のリンクを開いてから、ログインしてください。");
       }
@@ -70,47 +65,42 @@ export default function SignupPage() {
           />
         </label>
 
-        {role === "student" ? (
-          <p className="text-xs leading-6 text-gray-500">
-            学生は、メールアドレス・パスワードは不要です。名前だけで、すぐに始められます。
-            <br />
-            （この端末・ブラウザに記録が残ります。機種変更などで引き継げない点はご了承ください）
-          </p>
-        ) : (
-          <>
-            <label className="text-sm font-medium text-gray-700">
-              学校名
-              <input
-                required
-                value={schoolName}
-                onChange={(e) => setSchoolName(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-base"
-                placeholder="例：〇〇専門学校"
-              />
-            </label>
-            <label className="text-sm font-medium text-gray-700">
-              メールアドレス
-              <input
-                required
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-base"
-              />
-            </label>
-            <label className="text-sm font-medium text-gray-700">
-              パスワード（8文字以上）
-              <input
-                required
-                minLength={8}
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-base"
-              />
-            </label>
-          </>
+        {role === "teacher" && (
+          <label className="text-sm font-medium text-gray-700">
+            学校名
+            <input
+              required
+              value={schoolName}
+              onChange={(e) => setSchoolName(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-base"
+              placeholder="例：〇〇専門学校"
+            />
+          </label>
         )}
+        <label className="text-sm font-medium text-gray-700">
+          メールアドレス
+          <input
+            required
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-base"
+          />
+        </label>
+        <label className="text-sm font-medium text-gray-700">
+          パスワード（8文字以上）
+          <input
+            required
+            minLength={8}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-base"
+          />
+        </label>
+        <p className="text-xs leading-6 text-gray-500">
+          メールアドレスとパスワードで登録します。別の端末・ブラウザでも、同じアカウントでログインできます。
+        </p>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
@@ -118,14 +108,12 @@ export default function SignupPage() {
           disabled={loading}
           className="mt-2 rounded-full bg-teal-600 px-6 py-3 text-base font-bold text-white transition hover:bg-teal-700 disabled:opacity-50"
         >
-          {loading ? "処理中…" : role === "student" ? "はじめる" : "登録する"}
+          {loading ? "処理中…" : "登録する"}
         </button>
       </form>
-      {role === "teacher" && (
-        <p className="mt-6 text-center text-sm text-gray-500">
-          すでにアカウントをお持ちの方は <Link href="/login" className="font-bold text-teal-700 underline">ログイン</Link>
-        </p>
-      )}
+      <p className="mt-6 text-center text-sm text-gray-500">
+        すでにアカウントをお持ちの方は <Link href="/login" className="font-bold text-teal-700 underline">ログイン</Link>
+      </p>
     </main>
   );
 }
